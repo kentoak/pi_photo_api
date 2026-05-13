@@ -154,18 +154,3 @@ def list_files():
         """
     html += "</body></html>"
     return HTMLResponse(html)
-
-@app.get("/gallery")
-def gallery():
-    files = get_files()
-    html = "<h1>Gallery</h1>"
-    for f in files:
-        html += f"""
-        <div style="margin:20px">
-            <a href="/file/{f}">
-                <img src="/file/{f}" width="300"><br>
-                {f}
-            </a>
-        </div>
-        """
-    return HTMLResponse(html)

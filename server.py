@@ -67,7 +67,12 @@ def get_files():
 def queue():
     sent = get_sent()
 
-    files = sorted(os.listdir(UPLOAD_DIR))
+    # files = sorted(os.listdir(UPLOAD_DIR))
+    files = [
+        f for f in os.listdir(UPLOAD_DIR)
+        if os.path.isfile(os.path.join(UPLOAD_DIR, f))
+    ]
+    files.sort(key=lambda f: os.path.getmtime(os.path.join(UPLOAD_DIR, f)))  # 古い順
 
     unsent = [
         f for f in files

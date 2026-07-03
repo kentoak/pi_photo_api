@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
 import os
 from datetime import datetime
-
+from urllib.parse import quote
 ###
 # systemdで常駐 PATH: /etc/systemd/system/photoapi.service
 # 内容は _photoapi.service
@@ -20,6 +20,19 @@ UPLOAD_DIR = "uploads"
 SENT_FILE = "sent.txt"
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+from hashlib import md5
+
+def make_map():
+    table = {}
+
+    for f in os.listdir(UPLOAD_DIR):
+        if "%" in f:
+            table[md5(f.encode()).hexdigest()] = f
+        else:
+            table[quote(f)] = f
+
+    return table
 
 def get_sent():
     if not os.path.exists(SENT_FILE):
@@ -63,6 +76,7 @@ def get_files():
     )
     return files
 
+#http://100.117.5.28:8000/queue
 @app.get("/queue")
 def queue():
     sent = get_sent()
@@ -74,23 +88,53 @@ def queue():
     ]
     files.sort(key=lambda f: os.path.getmtime(os.path.join(UPLOAD_DIR, f)))  # 古い順
 
-    unsent = [
-        f for f in files
-        if f not in sent
-    ]
+    # unsent = [
+    #     f for f in files
+    #     if f not in sent
+    # ]
 
-    return {"files": unsent}
+    # return {"files": unsent}
+    # return {
+    #     "files": [
+    #         f"http://100.117.5.28:8000/file/{quote(f)}"
+    #         for f in files
+    #         if f not in sent
+    #     ]
+    # }
+    result = []
+
+    for f in files:
+        if f in sent:
+            continue
+
+        if "%" in f:
+            key = md5(f.encode("utf-8")).hexdigest()
+        else:
+            key = quote(f)
+
+        result.append({
+            "id": key,
+            "name": f
+        })
+
+    return {"files": result}
 
 @app.get("/file/{filename}")
 def file(filename: str):
-    path = os.path.join(UPLOAD_DIR, filename)
-    if not os.path.isfile(path):
-        raise HTTPException(404, "Not found")
+    table = make_map()
 
+    if key not in table:
+        return FileResponse("noimage.jpg")
+
+    path = os.path.join(UPLOAD_DIR, table[key])
     return FileResponse(path)
 
 @app.post("/mark_sent/{filename}")
 def mark_sent(filename: str):
+    filename = unquote(filename)
+
+    if filename.startswith("http://") or filename.startswith("https://"):
+        filename = filename.replace("http://100.117.5.28:8000/file/","")
 
     with open(SENT_FILE, "a") as f:
         f.write(filename + "\n")

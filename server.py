@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
 import os
 from datetime import datetime
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 ###
 # systemdで常駐 PATH: /etc/systemd/system/photoapi.service
 # 内容は _photoapi.service
@@ -12,6 +12,8 @@ from urllib.parse import quote
 #    systemctl status photoapi
 # リアルタイムログ確認
 # journalctl -u photoapi -f
+# http://100.117.5.28:8000/queue
+# http://100.117.5.28:8000/list
 ###
 
 app = FastAPI()
@@ -88,45 +90,26 @@ def queue():
     ]
     files.sort(key=lambda f: os.path.getmtime(os.path.join(UPLOAD_DIR, f)))  # 古い順
 
-    # unsent = [
-    #     f for f in files
-    #     if f not in sent
-    # ]
+    unsent = [
+        f"http://100.117.5.28:8000/file/{f}" for f in files
+        if f not in sent
+    ]
 
-    # return {"files": unsent}
-    # return {
-    #     "files": [
-    #         f"http://100.117.5.28:8000/file/{quote(f)}"
-    #         for f in files
-    #         if f not in sent
-    #     ]
-    # }
-    result = []
+    return {"files": unsent}
 
-    for f in files:
-        if f in sent:
-            continue
 
-        if "%" in f:
-            key = md5(f.encode("utf-8")).hexdigest()
-        else:
-            key = quote(f)
-
-        result.append({
-            "id": key,
-            "name": f
-        })
-
-    return {"files": result}
-
-@app.get("/file/{filename}")
-def file(filename: str):
+@app.get("/file/{key}")
+def file(key: str):
     table = make_map()
 
     if key not in table:
         return FileResponse("noimage.jpg")
 
-    path = os.path.join(UPLOAD_DIR, table[key])
+    path = os.path.join(
+        UPLOAD_DIR,
+        table[key]
+    )
+
     return FileResponse(path)
 
 @app.post("/mark_sent/{filename}")

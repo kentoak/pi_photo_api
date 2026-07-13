@@ -25,14 +25,22 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 from hashlib import md5
 
+# def make_map():
+#     table = {}
+
+#     for f in os.listdir(UPLOAD_DIR):
+#         if "%" in f:
+#             table[md5(f.encode()).hexdigest()] = f
+#         else:
+#             table[quote(f)] = f
+
+#     return table
+
 def make_map():
     table = {}
 
     for f in os.listdir(UPLOAD_DIR):
-        if "%" in f:
-            table[md5(f.encode()).hexdigest()] = f
-        else:
-            table[quote(f)] = f
+        table[quote(f, safe="%")] = f
 
     return table
 
@@ -91,24 +99,29 @@ def queue():
     files.sort(key=lambda f: os.path.getmtime(os.path.join(UPLOAD_DIR, f)))  # 古い順
 
     unsent = [
-        f"http://100.117.5.28:8000/file/{f}" for f in files
+        f"http://100.117.5.28:8000/file/{quote(f)}" for f in files
         if f not in sent
     ]
 
     return {"files": unsent}
 
 
-@app.get("/file/{key}")
+@app.get("/file/{key:path}")
 def file(key: str):
+    # key = quote(key)
     table = make_map()
 
     if key not in table:
+        print("NOT FOUND:", key)
         return FileResponse("noimage.jpg")
 
-    path = os.path.join(
-        UPLOAD_DIR,
-        table[key]
-    )
+    filename = table[key]
+    path = os.path.join(UPLOAD_DIR, filename)
+
+    print("filename:", repr(filename))
+    print("path:", repr(path))
+    print("exists:", os.path.exists(path))
+    print("size:", os.path.getsize(path))
 
     return FileResponse(path)
 
